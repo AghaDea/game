@@ -1,7 +1,7 @@
 // ========== RUSSIAN ROULETTE GAME ==========
 // Full client-side app with Supabase realtime + demo fallback
 
-let supabase = null;
+let sb = null; // renamed to avoid conflict with window.supabase from CDN
 let currentUser = null;
 let currentRoom = null;
 let roomChannel = null;
@@ -12,7 +12,7 @@ let currentView = 'home';
 document.addEventListener('DOMContentLoaded', async () => {
   // Load Supabase if configured
   if (!DEMO_MODE && typeof window.supabase !== 'undefined') {
-    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   }
 
   // Check existing session
@@ -24,7 +24,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         showApp();
       } else {
         // Verify with DB
-        const { data } = await supabase.from('profiles').select('*').eq('id', currentUser.id).single();
+        const { data } = await sb.from('profiles').select('*').eq('id', currentUser.id).single();
         if (data) {
           currentUser = data;
           localStorage.setItem('rr_user', JSON.stringify(currentUser));
@@ -130,7 +130,7 @@ async function handleRegister(e) {
       showApp();
     } else {
       const hash = await hashPassword(password);
-      const { data, error } = await supabase.from('profiles').insert({
+      const { data, error } = await sb.from('profiles').insert({
         username, password_hash: hash, display_name: displayName
       }).select().single();
       if (error) throw error;
@@ -164,14 +164,14 @@ async function handleLogin(e) {
       toast('ورود موفق!', 'success');
       showApp();
     } else {
-      const { data, error } = await supabase.from('profiles')
+      const { data, error } = await sb.from('profiles')
         .select('*').eq('username', username).single();
       if (error || !data) throw new Error('کاربر یافت نشد');
       const hash = await hashPassword(password);
       if (data.password_hash !== hash) throw new Error('رمز عبور اشتباه است');
       currentUser = data;
       localStorage.setItem('rr_user', JSON.stringify(currentUser));
-      await supabase.from('profiles').update({ is_online: true, last_online: new Date().toISOString() }).eq('id', currentUser.id);
+      await sb.from('profiles').update({ is_online: true, last_online: new Date().toISOString() }).eq('id', currentUser.id);
       toast('ورود موفق!', 'success');
       showApp();
     }
@@ -190,7 +190,7 @@ async function hashPassword(pass) {
 
 function logout() {
   if (!DEMO_MODE && currentUser) {
-    supabase.from('profiles').update({ is_online: false }).eq('id', currentUser.id);
+    sb.from('profiles').update({ is_online: false }).eq('id', currentUser.id);
   }
   if (roomChannel) roomChannel.unsubscribe();
   if (notifChannel) notifChannel.unsubscribe();
@@ -233,7 +233,7 @@ async function loadLobby() {
     const open = rooms.filter(r => r.status === 'waiting' || r.status === 'playing');
     renderRoomList(open);
   } else {
-    const { data } = await supabase.from('rooms')
+    const { data } = await sb.from('rooms')
       .select('*, player1:profiles!rooms_player1_id_fkey(username, display_name), player2:profiles!rooms_player2_id_fkey(username, display_name)')
       .in('status', ['waiting', 'playing'])
       .order('created_at', { ascending: false })
@@ -296,7 +296,7 @@ async function createRoom() {
       currentRoom = room;
       enterGame(room);
     } else {
-      const { data, error } = await supabase.from('rooms').insert({
+      const { data, error } = await sb.from('rooms').insert({
         room_code: code,
         creator_id: currentUser.id,
         player1_id: currentUser.id,
@@ -359,17 +359,17 @@ async function joinByCode() {
       currentRoom = room;
       enterGame(room);
     } else {
-      const { data: room, error } = await supabase.from('rooms')
+      const { data: room, error } = await sb.from('rooms')
         .select('*').eq('room_code', code).eq('status', 'waiting').single();
       if (error || !room) throw new Error('روم یافت نشد یا پر است');
       if (room.player1_id === currentUser.id) throw new Error('خودت سازنده رومی');
-      const { data: updated, error: upErr } = await supabase.from('rooms')
+      const { data: updated, error: upErr } = await sb.from('rooms')
         .update({ player2_id: currentUser.id, status: 'playing', current_turn: room.player1_id })
         .eq('id', room.id)
         .select().single();
       if (upErr) throw upErr;
       // Notify creator
-      await supabase.from('notifications').insert({
+      await sb.from('notifications').insert({
         user_id: room.player1_id,
         type: 'duel_accepted',
         title: 'حریف وارد شد!',
@@ -401,16 +401,16 @@ async function joinRoom(roomId) {
       currentRoom = room;
       enterGame(room);
     } else {
-      const { data: room } = await supabase.from('rooms').select('*').eq('id', roomId).single();
+      const { data: room } = await sb.from('rooms').select('*').eq('id', roomId).single();
       if (!room) throw new Error('روم یافت نشد');
       if (room.status === 'waiting' && !room.player2_id && room.player1_id !== currentUser.id) {
-        await supabase.from('rooms').update({
+        await sb.from('rooms').update({
           player2_id: currentUser.id,
           status: 'playing',
           current_turn: room.player1_id
         }).eq('id', roomId);
       }
-      const { data: updated } = await supabase.from('rooms').select('*').eq('id', roomId).single();
+      const { data: updated } = await sb.from('rooms').select('*').eq('id', roomId).single();
       currentRoom = updated;
       enterGame(updated);
     }
@@ -603,7 +603,7 @@ async function shoot(target) {
     renderGame();
     if (finished) endGame(room);
   } else {
-    await supabase.from('rooms').update({
+    await sb.from('rooms').update({
       player1_lives: room.player1_lives,
       player2_lives: room.player2_lives,
       current_turn: room.current_turn,
@@ -614,7 +614,7 @@ async function shoot(target) {
     }).eq('id', room.id);
 
     // Log
-    await supabase.from('game_logs').insert({
+    await sb.from('game_logs').insert({
       room_id: room.id,
       player_id: currentUser.id,
       action: isLoaded ? (target === 'self' ? 'hit_self' : 'hit_opponent') : (target === 'self' ? 'empty_self' : 'empty_opponent'),
@@ -634,9 +634,9 @@ async function updateStats(room) {
   const loserId = winnerId === room.player1_id ? room.player2_id : room.player1_id;
 
   // Winner
-  const { data: winner } = await supabase.from('profiles').select('*').eq('id', winnerId).single();
+  const { data: winner } = await sb.from('profiles').select('*').eq('id', winnerId).single();
   if (winner) {
-    await supabase.from('profiles').update({
+    await sb.from('profiles').update({
       wins: winner.wins + 1,
       total_games: winner.total_games + 1,
       xp: winner.xp + 50,
@@ -645,9 +645,9 @@ async function updateStats(room) {
   }
 
   // Loser
-  const { data: loser } = await supabase.from('profiles').select('*').eq('id', loserId).single();
+  const { data: loser } = await sb.from('profiles').select('*').eq('id', loserId).single();
   if (loser) {
-    await supabase.from('profiles').update({
+    await sb.from('profiles').update({
       losses: loser.losses + 1,
       total_games: loser.total_games + 1,
       xp: Math.max(0, loser.xp + 10),
@@ -656,7 +656,7 @@ async function updateStats(room) {
   }
 
   // Notifications
-  await supabase.from('notifications').insert([
+  await sb.from('notifications').insert([
     {
       user_id: winnerId,
       type: 'game_result',
@@ -687,7 +687,7 @@ function endGame(room) {
   // Auto close room after delay in real mode
   setTimeout(() => {
     if (!DEMO_MODE) {
-      supabase.from('rooms').update({ status: 'closed' }).eq('id', room.id);
+      sb.from('rooms').update({ status: 'closed' }).eq('id', room.id);
     }
   }, 5000);
 }
@@ -703,7 +703,7 @@ async function leaveRoom() {
     roomChannel = null;
   }
   if (currentRoom && !DEMO_MODE && currentRoom.status === 'waiting' && currentRoom.player1_id === currentUser.id) {
-    await supabase.from('rooms').delete().eq('id', currentRoom.id);
+    await sb.from('rooms').delete().eq('id', currentRoom.id);
   }
   currentRoom = null;
   navigateTo('home');
@@ -711,10 +711,10 @@ async function leaveRoom() {
 
 // Realtime room subscription
 function subscribeToRoom(roomId) {
-  if (DEMO_MODE || !supabase) return;
+  if (DEMO_MODE || !sb) return;
   if (roomChannel) roomChannel.unsubscribe();
 
-  roomChannel = supabase.channel(`room:${roomId}`)
+  roomChannel = sb.channel(`room:${roomId}`)
     .on('postgres_changes', {
       event: 'UPDATE',
       schema: 'public',
@@ -732,8 +732,8 @@ function subscribeToRoom(roomId) {
 
 // ========== NOTIFICATIONS ==========
 function subscribeToNotifications() {
-  if (DEMO_MODE || !supabase || !currentUser) return;
-  notifChannel = supabase.channel(`user:${currentUser.id}:notifs`)
+  if (DEMO_MODE || !sb || !currentUser) return;
+  notifChannel = sb.channel(`user:${currentUser.id}:notifs`)
     .on('postgres_changes', {
       event: 'INSERT',
       schema: 'public',
@@ -770,7 +770,7 @@ async function loadNotifications() {
     return;
   }
 
-  const { data } = await supabase.from('notifications')
+  const { data } = await sb.from('notifications')
     .select('*')
     .eq('user_id', currentUser.id)
     .order('created_at', { ascending: false })
@@ -796,7 +796,7 @@ function toggleNotifPanel() {
 
 async function markRead(id) {
   if (!DEMO_MODE) {
-    await supabase.from('notifications').update({ is_read: true }).eq('id', id);
+    await sb.from('notifications').update({ is_read: true }).eq('id', id);
   }
   loadNotifications();
 }
@@ -854,7 +854,7 @@ async function loadLeaderboard() {
     users.sort((a, b) => (b.rank_points || 0) - (a.rank_points || 0));
     renderLeaderboard(users.slice(0, 20));
   } else {
-    const { data } = await supabase.from('profiles')
+    const { data } = await sb.from('profiles')
       .select('id, username, display_name, title, level, wins, rank_points, xp')
       .order('rank_points', { ascending: false })
       .limit(20);
@@ -892,7 +892,7 @@ async function viewProfile(userId) {
       navigateTo('profile');
     }
   } else {
-    const { data } = await supabase.from('profiles').select('*').eq('id', userId).single();
+    const { data } = await sb.from('profiles').select('*').eq('id', userId).single();
     if (data) {
       loadProfile(data);
       navigateTo('profile');
@@ -922,7 +922,7 @@ async function saveSettings() {
         localStorage.setItem('rr_users', JSON.stringify(users));
       }
     } else {
-      await supabase.from('profiles').update({ display_name: displayName, bio }).eq('id', currentUser.id);
+      await sb.from('profiles').update({ display_name: displayName, bio }).eq('id', currentUser.id);
       currentUser.display_name = displayName;
       currentUser.bio = bio;
       localStorage.setItem('rr_user', JSON.stringify(currentUser));
@@ -962,7 +962,7 @@ function formatTime(iso) {
 
 async function updateOnlineStatus(online) {
   if (DEMO_MODE || !currentUser) return;
-  await supabase.from('profiles').update({ 
+  await sb.from('profiles').update({ 
     is_online: online, 
     last_online: new Date().toISOString() 
   }).eq('id', currentUser.id);
