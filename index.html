@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>رولت روسی | Russian Roulette</title>
+  <meta name="description" content="بازی چندنفره رولت روسی آنلاین با روم، دوئل، پروفایل و لیدربورد" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/styles.css" />
+  <!-- Supabase JS -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+  <!-- Loading Overlay -->
+  <div id="loading" class="loading-overlay hidden">
+    <div class="spinner"></div>
+  </div>
+
+  <!-- Toast Container -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- ========== AUTH SCREEN ========== -->
+  <div id="auth-screen">
+    <div class="auth-container">
+      <div class="auth-logo">
+        <h1>🔫 رولت روسی</h1>
+        <p>بازی شانس و جرأت • چندنفره آنلاین</p>
+      </div>
+
+      <div class="card">
+        <div class="auth-tabs">
+          <div class="auth-tab active" data-tab="login">ورود</div>
+          <div class="auth-tab" data-tab="register">ثبت‌نام</div>
+        </div>
+
+        <!-- Login Form -->
+        <form id="login-form">
+          <div class="input-group">
+            <label>نام کاربری</label>
+            <input type="text" id="login-username" class="input" placeholder="نام کاربری خود را وارد کنید" required autocomplete="username" />
+          </div>
+          <div class="input-group">
+            <label>رمز عبور</label>
+            <input type="password" id="login-password" class="input" placeholder="رمز عبور" required autocomplete="current-password" />
+          </div>
+          <button type="submit" class="btn btn-primary w-full btn-lg">ورود به بازی</button>
+        </form>
+
+        <!-- Register Form -->
+        <form id="register-form" class="hidden">
+          <div class="input-group">
+            <label>نام کاربری</label>
+            <input type="text" id="reg-username" class="input" placeholder="حداقل ۳ کاراکتر" required minlength="3" maxlength="20" />
+          </div>
+          <div class="input-group">
+            <label>نام نمایشی (اختیاری)</label>
+            <input type="text" id="reg-displayname" class="input" placeholder="اسمی که دیگران می‌بینند" maxlength="30" />
+          </div>
+          <div class="input-group">
+            <label>رمز عبور</label>
+            <input type="password" id="reg-password" class="input" placeholder="حداقل ۴ کاراکتر" required minlength="4" />
+          </div>
+          <button type="submit" class="btn btn-primary w-full btn-lg">ساخت حساب</button>
+        </form>
+      </div>
+
+      <p class="text-center text-muted mt-4" style="font-size:0.85rem">
+        با ورود، قوانین بازی را می‌پذیرید. این یک بازی تفریحی است.
+      </p>
+    </div>
+  </div>
+
+  <!-- ========== MAIN APP ========== -->
+  <div id="app" class="hidden">
+    <!-- Navbar -->
+    <nav class="navbar">
+      <div class="navbar-brand">🔫 رولت روسی</div>
+      <div class="navbar-user">
+        <button id="notif-btn" class="notif-btn" title="اعلان‌ها">
+          🔔
+          <span id="notif-badge" class="notif-badge hidden">0</span>
+        </button>
+        <div class="user-badge" onclick="navigateTo('profile')">
+          <div class="user-avatar" id="nav-avatar">?</div>
+          <div>
+            <div id="nav-username" style="font-weight:600;font-size:0.9rem">User</div>
+            <div id="nav-title" style="font-size:0.75rem;color:var(--gold)">تازه‌کار</div>
+          </div>
+        </div>
+        <button id="logout-btn" class="btn btn-ghost btn-sm">خروج</button>
+      </div>
+    </nav>
+
+    <!-- Notifications Panel -->
+    <div id="notif-panel" class="notif-panel hidden">
+      <div class="notif-header">
+        <strong>اعلان‌ها</strong>
+        <button id="close-notif" class="btn btn-ghost btn-sm">✕</button>
+      </div>
+      <div id="notif-list" class="notif-list"></div>
+    </div>
+
+    <div class="main-content">
+      <!-- Sidebar -->
+      <aside class="sidebar">
+        <div class="sidebar-nav">
+          <div class="nav-item active" data-view="home">
+            <span class="icon">🏠</span> خانه / لابی
+          </div>
+          <div class="nav-item" data-view="game">
+            <span class="icon">🎮</span> بازی جاری
+          </div>
+          <div class="nav-item" data-view="profile">
+            <span class="icon">👤</span> پروفایل من
+          </div>
+          <div class="nav-item" data-view="leaderboard">
+            <span class="icon">🏆</span> رتبه‌بندی
+          </div>
+          <div class="nav-item" data-view="settings">
+            <span class="icon">⚙️</span> تنظیمات
+          </div>
+        </div>
+      </aside>
+
+      <!-- Content -->
+      <main class="content-area">
+        <!-- HOME / LOBBY -->
+        <div id="view-home" class="view">
+          <div class="lobby-grid">
+            <div class="card">
+              <div class="card-header">
+                <h3 class="card-title">ساخت روم جدید</h3>
+              </div>
+              <p class="text-muted mb-4">یک روم خصوصی بساز و کد را برای حریف بفرست، یا منتظر بمان کسی جوین شود.</p>
+              <button id="create-room-btn" class="btn btn-primary btn-lg w-full">🎯 ساخت روم رولت</button>
+              
+              <div style="margin:1.5rem 0;border-top:1px solid var(--border);padding-top:1.5rem">
+                <h4 class="mb-2">ورود با کد روم</h4>
+                <div class="flex gap-2">
+                  <input type="text" id="join-code-input" class="input" placeholder="مثلاً ABC123" maxlength="6" style="text-transform:uppercase;letter-spacing:2px" />
+                  <button id="join-code-btn" class="btn btn-secondary">ورود</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-header">
+                <h3 class="card-title">روم‌های باز</h3>
+                <button class="btn btn-ghost btn-sm" onclick="loadLobby()">🔄</button>
+              </div>
+              <div id="room-list" class="room-list">
+                <div class="text-center text-muted p-4">در حال بارگذاری...</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card mt-4">
+            <div class="card-header">
+              <h3 class="card-title">چگونه بازی کنیم؟</h3>
+            </div>
+            <ul style="line-height:2;color:var(--text-muted);padding-right:1.2rem">
+              <li>هر بازیکن <strong style="color:var(--text)">۴ جان</strong> دارد.</li>
+              <li>تعداد خان‌های طپانچه تصادفی بین ۲ تا ۸ است.</li>
+              <li>تیرهای پر و خالی تصادفی‌اند (هرگز همه پر یا همه خالی نیستند).</li>
+              <li>در نوبت خودت انتخاب می‌کنی: <strong style="color:var(--accent)">به خودت</strong> یا <strong style="color:var(--info)">به حریف</strong>.</li>
+              <li>اگر به خودت زدی و خالی بود، <strong>نوبت همچنان مال توست</strong>.</li>
+              <li>اگر تیر پر بخورد، یک جان کم می‌شود و نوبت عوض می‌شود.</li>
+              <li>اولین کسی که جان‌هایش تمام شود می‌بازد. روم خودکار بسته می‌شود.</li>
+              <li>برد و باخت روی XP، لول، رتبه و لقب تأثیر می‌گذارد.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- GAME VIEW -->
+        <div id="view-game" class="view hidden">
+          <div class="game-container">
+            <div id="room-info" class="text-muted" style="font-size:0.9rem"></div>
+
+            <div class="players-bar">
+              <div id="player1-card" class="player-card">
+                <div class="avatar" id="player1-avatar">P1</div>
+                <div class="player-name" id="player1-name">بازیکن ۱</div>
+                <div class="player-title">حریف</div>
+                <div class="lives" id="player1-lives"></div>
+              </div>
+              <div id="player2-card" class="player-card">
+                <div class="avatar" id="player2-avatar">P2</div>
+                <div class="player-name" id="player2-name">بازیکن ۲</div>
+                <div class="player-title">حریف</div>
+                <div class="lives" id="player2-lives"></div>
+              </div>
+            </div>
+
+            <div class="gun-area">
+              <div class="cylinder" id="cylinder"></div>
+              <div class="gun-center">🔫</div>
+            </div>
+
+            <div id="game-actions" class="text-center">
+              <p class="text-muted">روم را از لابی انتخاب یا بساز</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- PROFILE VIEW -->
+        <div id="view-profile" class="view hidden">
+          <div class="card">
+            <div class="profile-header">
+              <div class="profile-avatar-lg" id="profile-avatar">?</div>
+              <div>
+                <h2 id="profile-name">نام</h2>
+                <div id="profile-username" class="text-muted">@user</div>
+                <div id="profile-title" style="color:var(--gold);margin-top:0.35rem;font-weight:600">تازه‌کار</div>
+              </div>
+            </div>
+
+            <div class="xp-bar-container">
+              <div class="flex justify-between mb-2">
+                <span>لول <strong id="profile-level">1</strong></span>
+                <span id="xp-text" class="text-muted">0 / 100 XP</span>
+              </div>
+              <div class="xp-bar">
+                <div class="xp-fill" id="xp-fill" style="width:0%"></div>
+              </div>
+            </div>
+
+            <div class="profile-stats">
+              <div class="stat-box">
+                <div class="value" id="profile-wins">0</div>
+                <div class="label">برد</div>
+              </div>
+              <div class="stat-box">
+                <div class="value" id="profile-losses">0</div>
+                <div class="label">باخت</div>
+              </div>
+              <div class="stat-box">
+                <div class="value" id="profile-games">0</div>
+                <div class="label">کل بازی</div>
+              </div>
+              <div class="stat-box">
+                <div class="value" id="profile-rank">1000</div>
+                <div class="label">رتبه</div>
+              </div>
+              <div class="stat-box">
+                <div class="value" id="profile-xp">0</div>
+                <div class="label">XP</div>
+              </div>
+            </div>
+
+            <p class="text-muted" style="font-size:0.9rem;line-height:1.7">
+              لقب‌ها بر اساس لول، تعداد برد و رتبه امتیاز تغییر می‌کنند:
+              تازه‌کار → متوسط → با تجربه → خبره → حرفه‌ای → استاد → استاد بزرگ → افسانه
+            </p>
+          </div>
+        </div>
+
+        <!-- LEADERBOARD -->
+        <div id="view-leaderboard" class="view hidden">
+          <div class="card">
+            <div class="card-header">
+              <h3 class="card-title">🏆 جدول رتبه‌بندی</h3>
+            </div>
+            <div id="leader-list"></div>
+          </div>
+        </div>
+
+        <!-- SETTINGS -->
+        <div id="view-settings" class="view hidden">
+          <div class="card" style="max-width:480px">
+            <div class="card-header">
+              <h3 class="card-title">تنظیمات حساب</h3>
+            </div>
+            <div class="input-group">
+              <label>نام نمایشی</label>
+              <input type="text" id="settings-displayname" class="input" maxlength="30" />
+            </div>
+            <div class="input-group">
+              <label>بیو</label>
+              <textarea id="settings-bio" class="input" rows="3" maxlength="200" placeholder="چند کلمه درباره خودت..."></textarea>
+            </div>
+            <button class="btn btn-primary" onclick="saveSettings()">ذخیره تغییرات</button>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <!-- Result Modal -->
+  <div id="result-modal" class="overlay hidden">
+    <div class="modal">
+      <h2>نتیجه</h2>
+      <p>جزئیات</p>
+      <button class="btn btn-primary btn-lg" onclick="closeResultModal()">بازگشت به لابی</button>
+    </div>
+  </div>
+
+  <!-- Duel Request Modal -->
+  <div id="duel-modal" class="overlay hidden">
+    <div class="modal duel-modal">
+      <h2>⚔️ درخواست دوئل</h2>
+      <p><strong class="duel-from">بازیکن</strong> تو را به یک بازی رولت روسی دعوت کرده است.</p>
+      <div class="actions">
+        <button class="btn btn-success duel-accept">قبول و ورود</button>
+        <button class="btn btn-secondary duel-decline">رد کردن</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/config.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
