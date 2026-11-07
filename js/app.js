@@ -273,26 +273,29 @@ async function createRoom() {
   const { cylinder, loaded } = generateCylinder(chambers);
 
   try {
+    // IMPORTANT: player2_id must stay null until a REAL player joins
     if (DEMO_MODE) {
       const room = {
         id: crypto.randomUUID(),
         room_code: code,
         creator_id: currentUser.id,
         player1_id: currentUser.id,
-        player2_id: null,
+        player2_id: null,          // no auto opponent
         status: 'waiting',
         current_turn: currentUser.id,
         chambers,
         loaded_count: loaded,
         cylinder,
-        current_chamber: 0,
+        current_chamber: Math.floor(Math.random() * chambers),
         player1_lives: 4,
         player2_lives: 4,
         created_at: new Date().toISOString()
       };
       const rooms = JSON.parse(localStorage.getItem('rr_rooms') || '[]');
-      rooms.push(room);
-      localStorage.setItem('rr_rooms', JSON.stringify(rooms));
+      // clean old finished rooms
+      const clean = rooms.filter(r => r.status === 'waiting' || r.status === 'playing');
+      clean.push(room);
+      localStorage.setItem('rr_rooms', JSON.stringify(clean));
       currentRoom = room;
       enterGame(room);
     } else {
@@ -300,18 +303,21 @@ async function createRoom() {
         room_code: code,
         creator_id: currentUser.id,
         player1_id: currentUser.id,
+        player2_id: null,          // no auto opponent
         status: 'waiting',
         current_turn: currentUser.id,
         chambers,
         loaded_count: loaded,
         cylinder,
-        current_chamber: 0
+        current_chamber: Math.floor(Math.random() * chambers),
+        player1_lives: 4,
+        player2_lives: 4
       }).select().single();
       if (error) throw error;
       currentRoom = data;
       enterGame(data);
     }
-    toast(`روم ${code} ساخته شد`, 'success');
+    toast(`روم ساخته شد — کد: ${code}`, 'success');
   } catch (err) {
     toast(err.message || 'خطا در ساخت روم', 'error');
   }
@@ -432,62 +438,65 @@ function renderGame() {
   const room = currentRoom;
   if (!room) return;
 
-  // Players
   const isP1 = room.player1_id === currentUser.id;
-  const myLives = isP1 ? room.player1_lives : room.player2_lives;
-  const oppLives = isP1 ? room.player2_lives : room.player1_lives;
-  const myTurn = room.current_turn === currentUser.id;
+  const hasOpponent = !!room.player2_id;
+  const myLives = isP1 ? (room.player1_lives ?? 4) : (room.player2_lives ?? 4);
+  const oppLives = isP1 ? (room.player2_lives ?? 4) : (room.player1_lives ?? 4);
+  const myTurn = room.current_turn === currentUser.id && room.status === 'playing';
 
-  document.getElementById('player1-name').textContent = isP1 ? 
-    (currentUser.display_name || currentUser.username) : 'حریف';
-  document.getElementById('player2-name').textContent = isP1 ? 'حریف' : 
-    (currentUser.display_name || currentUser.username);
+  // Player names - never invent an opponent
+  const myName = currentUser.display_name || currentUser.username;
+  const oppName = hasOpponent ? 'حریف' : 'منتظر حریف...';
 
-  // Lives
-  document.getElementById('player1-lives').innerHTML = renderLives(isP1 ? myLives : oppLives);
-  document.getElementById('player2-lives').innerHTML = renderLives(isP1 ? oppLives : myLives);
+  // Left card = always "me", right card = opponent (or waiting)
+  document.getElementById('player1-name').textContent = myName;
+  document.getElementById('player1-avatar').textContent = myName[0].toUpperCase();
+  document.getElementById('player2-name').textContent = oppName;
+  document.getElementById('player2-avatar').textContent = hasOpponent ? '؟' : '⏳';
 
-  // Active turn highlight
-  document.getElementById('player1-card').classList.toggle('active-turn', 
-    (isP1 && myTurn) || (!isP1 && !myTurn));
-  document.getElementById('player2-card').classList.toggle('active-turn', 
-    (isP1 && !myTurn) || (!isP1 && myTurn));
+  document.getElementById('player1-lives').innerHTML = renderLives(myLives);
+  document.getElementById('player2-lives').innerHTML = hasOpponent ? renderLives(oppLives) : renderLives(0);
 
-  // Cylinder
+  // Highlight whose turn
+  document.getElementById('player1-card').classList.toggle('active-turn', myTurn);
+  document.getElementById('player2-card').classList.toggle('active-turn', hasOpponent && !myTurn && room.status === 'playing');
+
   renderCylinder(room);
 
-  // Actions
   const actions = document.getElementById('game-actions');
   if (room.status === 'finished') {
-    actions.innerHTML = `<p class="text-muted">بازی تمام شد</p>`;
-  } else if (room.status === 'waiting') {
+    actions.innerHTML = `<p class="text-muted">بازی تمام شد</p>
+      <button class="btn btn-primary mt-3" onclick="leaveRoom()">بازگشت به لابی</button>`;
+  } else if (room.status === 'waiting' || !hasOpponent) {
     actions.innerHTML = `
-      <p class="text-muted mb-4">در انتظار حریف... کد روم: <strong style="color:var(--gold)">${room.room_code}</strong></p>
-      <button class="btn btn-secondary" onclick="leaveRoom()">خروج از روم</button>
+      <div style="background:var(--bg-elevated);padding:1.25rem;border-radius:12px;border:1px dashed var(--border);margin-bottom:1rem">
+        <p style="font-size:1.1rem;margin-bottom:0.5rem">⏳ در انتظار حریف واقعی...</p>
+        <p class="text-muted" style="font-size:0.9rem">کد روم را برای دوستت بفرست:</p>
+        <div style="font-size:1.8rem;font-weight:800;color:var(--gold);letter-spacing:4px;margin:0.75rem 0">${room.room_code}</div>
+        <p class="text-muted" style="font-size:0.8rem">حریف باید از بخش «ورود با کد روم» این کد را وارد کند</p>
+      </div>
+      <button class="btn btn-secondary" onclick="leaveRoom()">لغو و خروج از روم</button>
     `;
   } else if (myTurn) {
     actions.innerHTML = `
-      <p class="text-muted mb-3">نوبت توست! تیر را به کجا بزنی؟</p>
+      <p class="mb-3" style="font-weight:600">نوبت توست — تیر را به کجا می‌زنی؟</p>
       <div class="action-buttons">
-        <button class="btn btn-danger action-btn" onclick="shoot('self')">
-          🔫 به خودم
-        </button>
-        <button class="btn btn-primary action-btn" onclick="shoot('opponent')">
-          🎯 به حریف
-        </button>
+        <button class="btn btn-danger action-btn" onclick="shoot('self')">🔫 به خودم</button>
+        <button class="btn btn-primary action-btn" onclick="shoot('opponent')">🎯 به حریف</button>
       </div>
-      <button class="btn btn-ghost mt-4" onclick="leaveRoom()">ترک بازی</button>
+      <p class="text-muted mt-3" style="font-size:0.85rem">اگر به خودت بزنی و خالی باشد، نوبت همچنان مال توست</p>
+      <button class="btn btn-ghost mt-3" onclick="leaveRoom()">ترک بازی</button>
     `;
   } else {
     actions.innerHTML = `
-      <p class="text-muted mb-3">منتظر نوبت حریف...</p>
-      <button class="btn btn-ghost" onclick="leaveRoom()">ترک بازی</button>
+      <p class="text-muted mb-3">منتظر حرکت حریف...</p>
+      <div class="spinner" style="margin:1rem auto"></div>
+      <button class="btn btn-ghost mt-3" onclick="leaveRoom()">ترک بازی</button>
     `;
   }
 
-  // Room info
-  document.getElementById('room-info').textContent = 
-    `روم ${room.room_code} • ${room.chambers} خان • ${room.loaded_count} تیر پر`;
+  document.getElementById('room-info').textContent =
+    `روم ${room.room_code} • ${room.chambers || '?'} خان • ${room.loaded_count || '?'} تیر پر`;
 }
 
 function renderLives(count) {
@@ -825,8 +834,11 @@ async function declineDuel(notifId) {
 // ========== PROFILE ==========
 function loadProfile(user) {
   if (!user) return;
+  const isOwn = currentUser && user.id === currentUser.id;
+
   document.getElementById('profile-avatar').textContent = (user.display_name || user.username)[0].toUpperCase();
-  document.getElementById('profile-name').textContent = user.display_name || user.username;
+  document.getElementById('profile-name').textContent =
+    (user.display_name || user.username) + (isOwn ? ' (شما)' : '');
   document.getElementById('profile-username').textContent = '@' + user.username;
   document.getElementById('profile-title').textContent = user.title || 'تازه‌کار';
   document.getElementById('profile-level').textContent = user.level || 1;
@@ -836,13 +848,30 @@ function loadProfile(user) {
   document.getElementById('profile-games').textContent = user.total_games || 0;
   document.getElementById('profile-rank').textContent = user.rank_points || 1000;
 
-  // XP bar (simple: next level at level^2 * 100)
+  // XP bar
   const level = user.level || 1;
   const currentLevelXp = (level - 1) * (level - 1) * 100;
   const nextLevelXp = level * level * 100;
-  const progress = Math.min(100, ((user.xp - currentLevelXp) / (nextLevelXp - currentLevelXp)) * 100);
-  document.getElementById('xp-fill').style.width = progress + '%';
+  const progress = Math.min(100, (( (user.xp || 0) - currentLevelXp) / (nextLevelXp - currentLevelXp || 1)) * 100);
+  document.getElementById('xp-fill').style.width = Math.max(0, progress) + '%';
   document.getElementById('xp-text').textContent = `${user.xp || 0} / ${nextLevelXp} XP`;
+
+  // Show "back to leaderboard" when viewing others
+  let backBtn = document.getElementById('profile-back-btn');
+  if (!backBtn) {
+    backBtn = document.createElement('button');
+    backBtn.id = 'profile-back-btn';
+    backBtn.className = 'btn btn-secondary btn-sm';
+    backBtn.style.marginTop = '1rem';
+    document.querySelector('#view-profile .card')?.appendChild(backBtn);
+  }
+  if (isOwn) {
+    backBtn.classList.add('hidden');
+  } else {
+    backBtn.classList.remove('hidden');
+    backBtn.textContent = '← بازگشت به رتبه‌بندی';
+    backBtn.onclick = () => navigateTo('leaderboard');
+  }
 }
 
 async function loadLeaderboard() {
@@ -884,20 +913,33 @@ function renderLeaderboard(users) {
 }
 
 async function viewProfile(userId) {
-  if (DEMO_MODE) {
-    const users = Object.values(JSON.parse(localStorage.getItem('rr_users') || '{}'));
-    const u = users.find(x => x.id === userId);
-    if (u) {
-      loadProfile(u);
-      navigateTo('profile');
+  if (!userId) return;
+  showLoading(true);
+  try {
+    let user = null;
+    if (DEMO_MODE) {
+      const users = Object.values(JSON.parse(localStorage.getItem('rr_users') || '{}'));
+      user = users.find(x => x.id === userId);
+    } else {
+      const { data, error } = await sb.from('profiles').select('*').eq('id', userId).single();
+      if (error) throw error;
+      user = data;
     }
-  } else {
-    const { data } = await sb.from('profiles').select('*').eq('id', userId).single();
-    if (data) {
-      loadProfile(data);
-      navigateTo('profile');
+    if (!user) {
+      toast('پروفایل یافت نشد', 'error');
+      return;
     }
+    // Load the OTHER user's profile (not currentUser)
+    loadProfile(user);
+    // Mark that we are viewing someone else
+    const isOwn = user.id === currentUser.id;
+    document.getElementById('profile-name').textContent =
+      (user.display_name || user.username) + (isOwn ? ' (شما)' : '');
+    navigateTo('profile');
+  } catch (err) {
+    toast('خطا در بارگذاری پروفایل', 'error');
   }
+  showLoading(false);
 }
 
 function loadSettings() {
