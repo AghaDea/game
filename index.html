@@ -1,485 +1,348 @@
+
 <!DOCTYPE html>
 <html lang="fa" dir="rtl">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ChatLoga | SA-MP Style Log Viewer</title>
-  <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ChatLoga</title>
 
-    body {
-      background: #0a0a0a;
-      color: #c8c8c8;
-      font-family: "Courier New", Courier, monospace;
-      font-size: 14px;
-      line-height: 1.45;
-      min-height: 100vh;
-      overflow-x: hidden;
-    }
+<style>
+*{box-sizing:border-box}
 
-    /* هدر شبیه سرور سمپ */
-    .header {
-      background: linear-gradient(180deg, #1a1a1a 0%, #0d0d0d 100%);
-      border-bottom: 2px solid #333;
-      padding: 12px 20px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      position: sticky;
-      top: 0;
-      z-index: 100;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.8);
-    }
+body{
+ margin:0;
+ background:#0b1018;
+ color:#e7edf5;
+ font-family:Tahoma,Arial,sans-serif;
+}
 
-    .header h1 {
-      color: #ffcc00;
-      font-size: 18px;
-      letter-spacing: 1px;
-      text-shadow: 0 0 8px rgba(255,204,0,0.4);
-    }
+header{
+ background:#151d28;
+ border-bottom:1px solid #303b49;
+ padding:18px;
+ font-size:21px;
+ font-weight:bold;
+ color:#52d99c;
+}
 
-    .header .status {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      font-size: 12px;
-      color: #888;
-    }
+main{
+ max-width:900px;
+ margin:auto;
+ padding:18px;
+}
 
-    .status-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: #00ff00;
-      box-shadow: 0 0 6px #00ff00;
-      animation: pulse 2s infinite;
-    }
+h3{
+ font-size:16px;
+ margin:15px 0;
+}
 
-    .status-dot.offline {
-      background: #ff3333;
-      box-shadow: 0 0 6px #ff3333;
-      animation: none;
-    }
+input{
+ width:100%;
+ padding:12px;
+ margin:8px 0;
+ background:#111b28;
+ border:1px solid #35465a;
+ border-radius:5px;
+ color:white;
+ font-size:14px;
+}
 
-    @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.5; }
-    }
+button{
+ background:#238c63;
+ border:0;
+ padding:11px 17px;
+ color:white;
+ border-radius:5px;
+ font-size:14px;
+ cursor:pointer;
+}
 
-    /* بخش اصلی ChatLoga */
-    .chatloga-container {
-      max-width: 1100px;
-      margin: 0 auto;
-      padding: 16px;
-    }
+.toolbar{
+ display:flex;
+ gap:10px;
+ flex-wrap:wrap;
+ margin:15px 0;
+}
 
-    .chatloga-title {
-      color: #00ccff;
-      font-size: 15px;
-      margin-bottom: 10px;
-      padding-bottom: 6px;
-      border-bottom: 1px solid #222;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
+.toolbar input{
+ flex:1;
+ min-width:150px;
+}
 
-    .chatloga-title span {
-      color: #666;
-      font-size: 12px;
-    }
+.log{
+ padding:15px 3px;
+ border-bottom:1px solid #293544;
+}
 
-    /* خود لاگ‌ها - ظاهر سمپ */
-    .chat-log {
-      background: #000000;
-      border: 1px solid #222;
-      border-radius: 4px;
-      padding: 12px 14px;
-      min-height: 420px;
-      max-height: 70vh;
-      overflow-y: auto;
-      box-shadow: inset 0 0 20px rgba(0,0,0,0.9);
-    }
+.meta{
+ color:#8fa5bd;
+ font-size:11px;
+ line-height:2;
+}
 
-    .chat-log::-webkit-scrollbar {
-      width: 8px;
-    }
-    .chat-log::-webkit-scrollbar-track {
-      background: #111;
-    }
-    .chat-log::-webkit-scrollbar-thumb {
-      background: #333;
-      border-radius: 4px;
-    }
+.player{
+ color:#5bdfa4;
+ font-size:15px;
+ font-weight:bold;
+ margin:7px 0;
+}
 
-    .log-entry {
-      margin-bottom: 3px;
-      padding: 2px 0;
-      word-break: break-word;
-      white-space: pre-wrap;
-    }
+.site{
+ color:#80b9ff;
+ font-size:12px;
+ direction:ltr;
+ text-align:left;
+ overflow-wrap:anywhere;
+ margin:7px 0;
+}
 
-    .log-entry .time {
-      color: #666;
-      margin-left: 6px;
-      font-size: 12px;
-    }
+.data{
+ background:#101a27;
+ padding:10px;
+ direction:ltr;
+ text-align:left;
+ white-space:pre-wrap;
+ overflow-wrap:anywhere;
+ font-size:12px;
+ line-height:1.8;
+ color:#d5e2f0;
+ border-radius:4px;
+}
 
-    .log-entry .msg {
-      color: #e0e0e0;
-    }
+.hidden{display:none}
 
-    /* رنگ‌های شبیه سمپ */
-    .log-entry.system .msg { color: #ffcc00; }
-    .log-entry.info .msg { color: #00ccff; }
-    .log-entry.error .msg { color: #ff4444; }
-    .log-entry.success .msg { color: #00ff88; }
+#error{
+ color:#ff7688;
+ font-size:12px;
+ margin-top:10px;
+}
 
-    /* کنترل‌ها */
-    .controls {
-      margin-top: 14px;
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
-      align-items: center;
-    }
+#logs{
+ margin-top:15px;
+}
 
-    button {
-      background: #1a1a1a;
-      border: 1px solid #333;
-      color: #ccc;
-      padding: 7px 14px;
-      font-family: inherit;
-      font-size: 13px;
-      cursor: pointer;
-      border-radius: 3px;
-      transition: all 0.15s;
-    }
+.empty{
+ text-align:center;
+ color:#8b9bad;
+ padding:35px 5px;
+}
 
-    button:hover {
-      background: #252525;
-      border-color: #555;
-      color: #fff;
-    }
-
-    button.active {
-      background: #003366;
-      border-color: #0066cc;
-      color: #00ccff;
-    }
-
-    .info-box {
-      margin-top: 20px;
-      background: #111;
-      border: 1px solid #222;
-      border-radius: 4px;
-      padding: 14px;
-      font-size: 12px;
-      color: #999;
-      line-height: 1.6;
-    }
-
-    .info-box h3 {
-      color: #ffcc00;
-      margin-bottom: 8px;
-      font-size: 13px;
-    }
-
-    .info-box code {
-      background: #1a1a1a;
-      padding: 2px 6px;
-      border-radius: 3px;
-      color: #00ff88;
-      font-size: 11px;
-    }
-
-    .empty-state {
-      color: #444;
-      text-align: center;
-      padding: 60px 20px;
-      font-size: 13px;
-    }
-
-    /* تنظیمات API (مخفی در حالت عادی) */
-    .config-panel {
-      display: none;
-      margin-top: 16px;
-      background: #111;
-      border: 1px solid #333;
-      padding: 12px;
-      border-radius: 4px;
-    }
-
-    .config-panel.show {
-      display: block;
-    }
-
-    .config-panel label {
-      display: block;
-      margin-bottom: 6px;
-      color: #aaa;
-      font-size: 12px;
-    }
-
-    .config-panel input {
-      width: 100%;
-      background: #000;
-      border: 1px solid #333;
-      color: #0f0;
-      padding: 8px;
-      font-family: monospace;
-      font-size: 12px;
-      margin-bottom: 10px;
-      border-radius: 3px;
-    }
-
-    .footer {
-      text-align: center;
-      padding: 20px;
-      color: #444;
-      font-size: 11px;
-    }
-  </style>
+</style>
 </head>
+
 <body>
 
-  <div class="header">
-    <h1>⚡ ChatLoga — SA-MP Style Viewer</h1>
-    <div class="status">
-      <div class="status-dot" id="statusDot"></div>
-      <span id="statusText">Connecting...</span>
-      <span id="lastUpdate"></span>
+<header>ChatLoga</header>
+
+<main>
+
+<section id="login">
+
+<h3>ورود مدیریت</h3>
+
+<input
+ id="password"
+ type="password"
+ placeholder="رمز مدیریت"
+>
+
+<button onclick="login()">ورود</button>
+
+<div id="error"></div>
+
+</section>
+
+<section id="content" class="hidden">
+
+<h3>ChatLoga</h3>
+
+<div class="toolbar">
+
+<input
+ id="search"
+ placeholder="جستجو..."
+ oninput="render()"
+>
+
+<button onclick="loadLogs()">بروزرسانی</button>
+
+<button onclick="logout()">خروج</button>
+
+</div>
+
+<div id="logs"></div>
+
+</section>
+
+</main>
+
+<script>
+
+const PROJECT = "YOUR_PROJECT_REF";
+
+const API_KEY = "YOUR_SUPABASE_PUBLISHABLE_KEY";
+
+const API =
+"https://" + PROJECT +
+".supabase.co/rest/v1/rpc/";
+
+let password = "";
+let entries = [];
+
+async function rpc(name,body){
+
+ const response = await fetch(API + name,{
+  method:"POST",
+
+  headers:{
+   "Content-Type":"application/json",
+   "apikey":API_KEY,
+   "Authorization":"Bearer "+API_KEY
+  },
+
+  body:JSON.stringify(body)
+ });
+
+ const result = await response.json();
+
+ if(!response.ok){
+  throw new Error(
+   result.message || "Connection error"
+  );
+ }
+
+ return result;
+}
+
+async function login(){
+
+ password =
+ document.getElementById("password").value;
+
+ try{
+
+  await loadLogs();
+
+  document.getElementById("login")
+   .classList.add("hidden");
+
+  document.getElementById("content")
+   .classList.remove("hidden");
+
+ }catch(e){
+
+  document.getElementById("error")
+   .textContent="رمز اشتباه یا خطای اتصال";
+
+  password="";
+
+ }
+
+}
+
+async function loadLogs(){
+
+ const result = await rpc("lac_list",{
+  p_password:password
+ });
+
+ entries=result.items||[];
+
+ render();
+
+}
+
+function escapeHTML(value){
+
+ return String(value??"").replace(
+  /[&<>"']/g,
+  c=>({
+   "&":"&amp;",
+   "<":"&lt;",
+   ">":"&gt;",
+   '"':"&quot;",
+   "'":"&#39;"
+  })[c]
+ );
+
+}
+
+function render(){
+
+ const query =
+ document.getElementById("search")
+ .value.toLowerCase();
+
+ const filtered=entries.filter(x=>
+  JSON.stringify(x).toLowerCase()
+  .includes(query)
+ );
+
+ const box=document.getElementById("logs");
+
+ if(!filtered.length){
+
+  box.innerHTML=
+  '<div class="empty">موردی وجود ندارد</div>';
+
+  return;
+ }
+
+ box.innerHTML=filtered.map(x=>{
+
+  const date=new Date(x.created_at);
+
+  return `
+
+   <div class="log">
+
+    <div class="meta">
+     #${escapeHTML(x.id)}
+     · ${escapeHTML(date.toLocaleDateString("fa-IR"))}
+     · ${escapeHTML(date.toLocaleTimeString("fa-IR"))}
     </div>
-  </div>
 
-  <div class="chatloga-container">
-    <div class="chatloga-title">
-      <span>ChatLoga</span>
-      <span id="countLabel">0 entries</span>
+    <div class="player">
+     ${escapeHTML(x.player_name||"Unknown")}
     </div>
 
-    <div class="chat-log" id="chatLog">
-      <div class="empty-state">در حال بارگذاری لاگ‌ها...</div>
+    <div class="site">
+     ${escapeHTML(x.site||"No site provided")}
     </div>
 
-    <div class="controls">
-      <button id="btnRefresh">🔄 Refresh</button>
-      <button id="btnAuto" class="active">Auto: ON</button>
-      <button id="btnClearView">Clear View</button>
-      <button id="btnConfig">⚙️ Config</button>
-      <button id="btnScrollBottom">↓ Bottom</button>
-    </div>
+    <pre class="data">${escapeHTML(
+     JSON.stringify(x.details,null,2)
+    )}</pre>
 
-    <div class="config-panel" id="configPanel">
-      <label>Supabase URL:</label>
-      <input type="text" id="sbUrl" placeholder="https://xxxxx.supabase.co" />
-      <label>Supabase Anon Key:</label>
-      <input type="text" id="sbKey" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." />
-      <button id="btnSaveConfig">Save & Connect</button>
-      <p style="margin-top:10px;color:#666;font-size:11px;">
-        کلیدها در localStorage مرورگر ذخیره می‌شوند (فقط روی این دستگاه).
-      </p>
-    </div>
+   </div>
 
-    <div class="info-box">
-      <h3>📖 راهنمای اتصال از بازی (SA-MP / open.mp)</h3>
-      <p>
-        چون GitHub Pages استاتیک است، بازی باید مستقیم به <strong>Supabase REST API</strong> ارسال کند.
-        <br><br>
-        <strong>آدرس POST:</strong><br>
-        <code>https://YOUR_PROJECT.supabase.co/rest/v1/chat_logs</code>
-        <br><br>
-        <strong>هدرهای لازم:</strong><br>
-        <code>apikey: YOUR_ANON_KEY</code><br>
-        <code>Authorization: Bearer YOUR_ANON_KEY</code><br>
-        <code>Content-Type: application/json</code><br>
-        <code>Prefer: return=minimal</code>
-        <br><br>
-        <strong>بدنه (JSON):</strong><br>
-        <code>{"global_string_a": "متن پیام شما از بازی"}</code>
-        <br><br>
-        مثال با پلاگین HTTP / webrequest (بسته به پلاگین شما فرمت کمی فرق می‌کند):
-        <br>
-        مقدار <code>global_string_a</code> را دقیقاً همان‌طور که بازی می‌فرستد نگه دارید.
-        <br><br>
-        چت‌های تکراری (متن دقیقاً یکسان) به خاطر UNIQUE در دیتابیس اضافه نمی‌شوند.
-      </p>
-    </div>
-  </div>
+  `;
 
-  <div class="footer">
-    ChatLoga • GitHub Pages + Supabase • ظاهر شبیه سرورهای SA-MP
-  </div>
+ }).join("");
 
-  <script>
-    // ================== تنظیمات ==================
-    // این دو مقدار را با اطلاعات پروژه Supabase خودت عوض کن
-    // یا از پنل Config داخل صفحه وارد کن
-    let SUPABASE_URL = localStorage.getItem('sb_url') || 'https://ihbsxjgzrhnssluqooqh.supabase.co';
-    let SUPABASE_ANON_KEY = localStorage.getItem('sb_key') || 'sb_publishable_hHyHJI5JkxgLNrXAwZrGWQ_vbD3kdrj';
+}
 
-    const TABLE = 'chat_logs';
-    let autoRefresh = true;
-    let refreshInterval = null;
-    let lastIds = new Set();
+function logout(){
 
-    // ================== المان‌ها ==================
-    const chatLogEl = document.getElementById('chatLog');
-    const statusDot = document.getElementById('statusDot');
-    const statusText = document.getElementById('statusText');
-    const countLabel = document.getElementById('countLabel');
-    const lastUpdate = document.getElementById('lastUpdate');
+ password="";
+ entries=[];
 
-    // ================== توابع اصلی ==================
-    function setStatus(online, msg) {
-      statusDot.classList.toggle('offline', !online);
-      statusText.textContent = msg || (online ? 'Online' : 'Offline');
-    }
+ document.getElementById("content")
+ .classList.add("hidden");
 
-    function formatTime(iso) {
-      if (!iso) return '';
-      const d = new Date(iso);
-      const pad = n => String(n).padStart(2, '0');
-      const date = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
-      const time = `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-      return `[${date} ${time}]`;
-    }
+ document.getElementById("login")
+ .classList.remove("hidden");
 
-    function detectType(text) {
-      const t = (text || '').toLowerCase();
-      if (t.includes('error') || t.includes('fail') || t.includes('کراش')) return 'error';
-      if (t.includes('success') || t.includes('connected') || t.includes('موفق')) return 'success';
-      if (t.includes('info') || t.includes('system') || t.startsWith('[server]')) return 'system';
-      return '';
-    }
+ document.getElementById("password").value="";
 
-    function renderLogs(rows) {
-      if (!rows || rows.length === 0) {
-        chatLogEl.innerHTML = '<div class="empty-state">هنوز هیچ لاگی وجود ندارد.<br>از بازی پیام ارسال کن.</div>';
-        countLabel.textContent = '0 entries';
-        return;
-      }
+}
 
-      // مرتب‌سازی از قدیمی به جدید (مثل لاگ سرور)
-      rows.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+document.getElementById("password")
+.addEventListener("keydown",e=>{
+ if(e.key==="Enter")login();
+});
 
-      let html = '';
-      rows.forEach(row => {
-        const type = detectType(row.global_string_a);
-        const timeStr = formatTime(row.created_at);
-        html += `<div class="log-entry ${type}">
-          <span class="time">${timeStr}</span>
-          <span class="msg">${escapeHtml(row.global_string_a)}</span>
-        </div>`;
-      });
+</script>
 
-      chatLogEl.innerHTML = html;
-      countLabel.textContent = rows.length + ' entries';
-      // اسکرول به پایین
-      chatLogEl.scrollTop = chatLogEl.scrollHeight;
-    }
-
-    function escapeHtml(str) {
-      if (!str) return '';
-      return String(str)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;');
-    }
-
-    async function fetchLogs() {
-      if (!SUPABASE_URL || SUPABASE_URL.includes('YOUR_PROJECT') || !SUPABASE_ANON_KEY || SUPABASE_ANON_KEY.includes('YOUR_ANON')) {
-        setStatus(false, 'Config needed');
-        chatLogEl.innerHTML = '<div class="empty-state">لطفاً از دکمه ⚙️ Config آدرس و کلید Supabase را وارد کن.</div>';
-        return;
-      }
-
-      try {
-        const res = await fetch(`${SUPABASE_URL}/rest/v1/${TABLE}?select=*&order=created_at.asc`, {
-          headers: {
-            'apikey': SUPABASE_ANON_KEY,
-            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-            'Content-Type': 'application/json'
-          }
-        });
-
-        if (!res.ok) {
-          throw new Error(`HTTP ${res.status}`);
-        }
-
-        const data = await res.json();
-        renderLogs(data);
-        setStatus(true, 'Online');
-        lastUpdate.textContent = '• ' + new Date().toLocaleTimeString('fa-IR');
-      } catch (err) {
-        console.error(err);
-        setStatus(false, 'Error: ' + err.message);
-      }
-    }
-
-    // ================== دکمه‌ها ==================
-    document.getElementById('btnRefresh').onclick = () => fetchLogs();
-
-    document.getElementById('btnAuto').onclick = function() {
-      autoRefresh = !autoRefresh;
-      this.classList.toggle('active', autoRefresh);
-      this.textContent = autoRefresh ? 'Auto: ON' : 'Auto: OFF';
-      if (autoRefresh) startAuto();
-      else stopAuto();
-    };
-
-    document.getElementById('btnClearView').onclick = () => {
-      chatLogEl.innerHTML = '<div class="empty-state">View cleared (data still in database)</div>';
-    };
-
-    document.getElementById('btnScrollBottom').onclick = () => {
-      chatLogEl.scrollTop = chatLogEl.scrollHeight;
-    };
-
-    document.getElementById('btnConfig').onclick = () => {
-      document.getElementById('configPanel').classList.toggle('show');
-      document.getElementById('sbUrl').value = SUPABASE_URL.includes('YOUR_PROJECT') ? '' : SUPABASE_URL;
-      document.getElementById('sbKey').value = SUPABASE_ANON_KEY.includes('YOUR_ANON') ? '' : SUPABASE_ANON_KEY;
-    };
-
-    document.getElementById('btnSaveConfig').onclick = () => {
-      const url = document.getElementById('sbUrl').value.trim();
-      const key = document.getElementById('sbKey').value.trim();
-      if (url && key) {
-        SUPABASE_URL = url.replace(/\/$/, '');
-        SUPABASE_ANON_KEY = key;
-        localStorage.setItem('sb_url', SUPABASE_URL);
-        localStorage.setItem('sb_key', SUPABASE_ANON_KEY);
-        document.getElementById('configPanel').classList.remove('show');
-        fetchLogs();
-        startAuto();
-      } else {
-        alert('هر دو فیلد را پر کن');
-      }
-    };
-
-    function startAuto() {
-      stopAuto();
-      if (autoRefresh) {
-        refreshInterval = setInterval(fetchLogs, 4000); // هر ۴ ثانیه
-      }
-    }
-
-    function stopAuto() {
-      if (refreshInterval) {
-        clearInterval(refreshInterval);
-        refreshInterval = null;
-      }
-    }
-
-    // شروع
-    fetchLogs();
-    startAuto();
-  </script>
 </body>
 </html>
