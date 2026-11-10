@@ -8,125 +8,49 @@
 
 <style>
 *{box-sizing:border-box}
-
 body{
  margin:0;
- background:#0b1018;
- color:#e7edf5;
+ background:#101820;
+ color:#fff;
  font-family:Tahoma,Arial,sans-serif;
 }
-
 header{
- background:#151d28;
- border-bottom:1px solid #303b49;
- padding:18px;
- font-size:21px;
- font-weight:bold;
- color:#52d99c;
-}
-
-main{
- max-width:900px;
- margin:auto;
- padding:18px;
-}
-
-h3{
- font-size:16px;
- margin:15px 0;
-}
-
-input{
- width:100%;
- padding:12px;
- margin:8px 0;
- background:#111b28;
- border:1px solid #35465a;
- border-radius:5px;
- color:white;
- font-size:14px;
-}
-
-button{
- background:#238c63;
- border:0;
- padding:11px 17px;
- color:white;
- border-radius:5px;
- font-size:14px;
- cursor:pointer;
-}
-
-.toolbar{
+ height:60px;
+ background:#182431;
+ border-bottom:1px solid #293746;
  display:flex;
- gap:10px;
- flex-wrap:wrap;
- margin:15px 0;
-}
-
-.toolbar input{
- flex:1;
- min-width:150px;
-}
-
-.log{
- padding:15px 3px;
- border-bottom:1px solid #293544;
-}
-
-.meta{
- color:#8fa5bd;
- font-size:11px;
- line-height:2;
-}
-
-.player{
- color:#5bdfa4;
- font-size:15px;
+ align-items:center;
+ padding:0 17px;
+ font-size:19px;
  font-weight:bold;
- margin:7px 0;
+ color:#55dca0;
 }
-
-.site{
- color:#80b9ff;
- font-size:12px;
- direction:ltr;
- text-align:left;
- overflow-wrap:anywhere;
- margin:7px 0;
+#messages{
+ max-width:850px;
+ margin:auto;
+ padding:12px 15px 25px;
 }
-
-.data{
- background:#101a27;
- padding:10px;
- direction:ltr;
- text-align:left;
+.message{
+ padding:13px 5px;
+ border-bottom:1px solid #283644;
+}
+.message-text{
+ font-size:14px;
+ line-height:1.9;
  white-space:pre-wrap;
  overflow-wrap:anywhere;
- font-size:12px;
- line-height:1.8;
- color:#d5e2f0;
- border-radius:4px;
 }
-
-.hidden{display:none}
-
-#error{
- color:#ff7688;
- font-size:12px;
- margin-top:10px;
+.time{
+ color:#8499ad;
+ font-size:10px;
+ margin-top:5px;
 }
-
-#logs{
- margin-top:15px;
-}
-
-.empty{
+#status{
  text-align:center;
- color:#8b9bad;
- padding:35px 5px;
+ padding:15px;
+ color:#8fa4b8;
+ font-size:12px;
 }
-
 </style>
 </head>
 
@@ -134,127 +58,78 @@ button{
 
 <header>ChatLoga</header>
 
-<main>
-
-<section id="login">
-
-<h3>ورود مدیریت</h3>
-
-<input
- id="password"
- type="password"
- placeholder="رمز مدیریت"
->
-
-<button onclick="login()">ورود</button>
-
-<div id="error"></div>
-
-</section>
-
-<section id="content" class="hidden">
-
-<h3>ChatLoga</h3>
-
-<div class="toolbar">
-
-<input
- id="search"
- placeholder="جستجو..."
- oninput="render()"
->
-
-<button onclick="loadLogs()">بروزرسانی</button>
-
-<button onclick="logout()">خروج</button>
-
-</div>
-
-<div id="logs"></div>
-
-</section>
-
-</main>
+<div id="status">در حال اتصال...</div>
+<div id="messages"></div>
 
 <script>
 
 const PROJECT = "YOUR_PROJECT_REF";
-
-const API_KEY = "YOUR_SUPABASE_PUBLISHABLE_KEY";
+const API_KEY = "YOUR_PUBLISHABLE_KEY";
 
 const API =
 "https://" + PROJECT +
-".supabase.co/rest/v1/rpc/";
+".supabase.co/rest/v1/rpc/chatlogs_read";
 
-let password = "";
-let entries = [];
-
-async function rpc(name,body){
-
- const response = await fetch(API + name,{
-  method:"POST",
-
-  headers:{
-   "Content-Type":"application/json",
-   "apikey":API_KEY,
-   "Authorization":"Bearer "+API_KEY
-  },
-
-  body:JSON.stringify(body)
- });
-
- const result = await response.json();
-
- if(!response.ok){
-  throw new Error(
-   result.message || "Connection error"
-  );
- }
-
- return result;
-}
-
-async function login(){
-
- password =
- document.getElementById("password").value;
+async function loadMessages(){
 
  try{
 
-  await loadLogs();
+  const response = await fetch(API,{
+   method:"POST",
+   headers:{
+    "apikey":API_KEY,
+    "Authorization":"Bearer "+API_KEY,
+    "Content-Type":"application/json"
+   },
+   body:"{}"
+  });
 
-  document.getElementById("login")
-   .classList.add("hidden");
+  if(!response.ok){
+   throw new Error("Connection failed");
+  }
 
-  document.getElementById("content")
-   .classList.remove("hidden");
+  const data = await response.json();
 
- }catch(e){
+  const box = document.getElementById("messages");
 
-  document.getElementById("error")
-   .textContent="رمز اشتباه یا خطای اتصال";
+  const status = document.getElementById("status");
 
-  password="";
+  status.textContent = data.length
+   ? "ChatLoga"
+   : "هنوز پیامی ارسال نشده است";
+
+  box.innerHTML = data.map(item=>{
+
+   const time = new Date(item.created_at);
+
+   return `
+    <div class="message">
+
+     <div class="message-text">${escapeHTML(item.message)}</div>
+
+     <div class="time">
+      ${escapeHTML(time.toLocaleDateString("fa-IR"))}
+      ·
+      ${escapeHTML(time.toLocaleTimeString("fa-IR"))}
+     </div>
+
+    </div>
+   `;
+
+  }).join("");
+
+ }catch(error){
+
+  document.getElementById("status")
+   .textContent="خطا در اتصال به سرور";
 
  }
 
 }
 
-async function loadLogs(){
+function escapeHTML(text){
 
- const result = await rpc("lac_list",{
-  p_password:password
- });
-
- entries=result.items||[];
-
- render();
-
-}
-
-function escapeHTML(value){
-
- return String(value??"").replace(
+ return String(text??"").replace(
   /[&<>"']/g,
   c=>({
    "&":"&amp;",
@@ -267,80 +142,10 @@ function escapeHTML(value){
 
 }
 
-function render(){
+loadMessages();
 
- const query =
- document.getElementById("search")
- .value.toLowerCase();
-
- const filtered=entries.filter(x=>
-  JSON.stringify(x).toLowerCase()
-  .includes(query)
- );
-
- const box=document.getElementById("logs");
-
- if(!filtered.length){
-
-  box.innerHTML=
-  '<div class="empty">موردی وجود ندارد</div>';
-
-  return;
- }
-
- box.innerHTML=filtered.map(x=>{
-
-  const date=new Date(x.created_at);
-
-  return `
-
-   <div class="log">
-
-    <div class="meta">
-     #${escapeHTML(x.id)}
-     · ${escapeHTML(date.toLocaleDateString("fa-IR"))}
-     · ${escapeHTML(date.toLocaleTimeString("fa-IR"))}
-    </div>
-
-    <div class="player">
-     ${escapeHTML(x.player_name||"Unknown")}
-    </div>
-
-    <div class="site">
-     ${escapeHTML(x.site||"No site provided")}
-    </div>
-
-    <pre class="data">${escapeHTML(
-     JSON.stringify(x.details,null,2)
-    )}</pre>
-
-   </div>
-
-  `;
-
- }).join("");
-
-}
-
-function logout(){
-
- password="";
- entries=[];
-
- document.getElementById("content")
- .classList.add("hidden");
-
- document.getElementById("login")
- .classList.remove("hidden");
-
- document.getElementById("password").value="";
-
-}
-
-document.getElementById("password")
-.addEventListener("keydown",e=>{
- if(e.key==="Enter")login();
-});
+// بروزرسانی خودکار هر 3 ثانیه
+setInterval(loadMessages,3000);
 
 </script>
 
